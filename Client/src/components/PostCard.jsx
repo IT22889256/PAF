@@ -1,139 +1,238 @@
-// src/components/PostCard.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
 import { toast } from 'react-toastify';
 
-export default function PostCard({ post, onDelete, onLike, onComment }) {
+export default function PostCard({ 
+  post, 
+  onLike, 
+  onComment,
+  onCommentDelete,
+  onFollowUser,
+  isFollowingUser
+}) {
   const { user } = useAuth();
+  const isAuthor = user && post.userId === user.id;
+  
   const [commentContent, setCommentContent] = useState('');
   const [showComments, setShowComments] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
   const [isCommenting, setIsCommenting] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowingLoading, setIsFollowingLoading] = useState(false);
+  const [isDeletingComment, setIsDeletingComment] = useState(null);
+
+  useEffect(() => {
+    if (isFollowingUser !== undefined) {
+      setIsFollowing(isFollowingUser);
+    }
+  }, [isFollowingUser]);
+
+  const hasLiked = user && post.likes?.includes(user.email);
 
   const handleLike = async () => {
-    if (!user) return;
+    if (!user) {
+      toast.info('Please login to like posts');
+      return;
+    }
+    
     setIsLiking(true);
     try {
       await onLike(post.id);
     } catch (error) {
-      toast.error('Failed to like post');
+      toast.error(error.response?.data?.error || 'Failed to toggle like');
     } finally {
       setIsLiking(false);
+    }
+  };
+
+  const handleFollow = async () => {
+    if (!user) {
+      toast.info('Please login to follow users');
+      return;
+    }
+    
+    if (isAuthor) {
+      toast.info("You can't follow yourself");
+      return;
+    }
+  
+    if (!onFollowUser || typeof onFollowUser !== 'function') {
+      console.error('onFollowUser is not a function');
+      toast.error('Follow functionality not available');
+      return;
+    }
+  
+    setIsFollowingLoading(true);
+    try {
+      const success = await onFollowUser(post.userId, !isFollowing);
+      
+      if (success) {
+        setIsFollowing(!isFollowing);
+        toast.success(!isFollowing ? 'Followed successfully' : 'Unfollowed successfully');
+      } else {
+        toast.error('Failed to toggle follow');
+      }
+    } catch (error) {
+      console.error('Follow error:', error);
+      toast.error(error.response?.data?.error || 'Failed to toggle follow');
+    } finally {
+      setIsFollowingLoading(false);
     }
   };
 
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
     if (!commentContent.trim()) return;
+    
+    if (!user) {
+      toast.info('Please login　　　　　to comment');
+      return;
+    }
+    
     setIsCommenting(true);
     try {
       await onComment(post.id, commentContent);
       setCommentContent('');
     } catch (error) {
-      toast.error('Failed to add comment');
+      toast.error(error.response?.data?.error || 'Failed to add comment');
     } finally {
       setIsCommenting(false);
     }
   };
 
-  const handleDelete = async () => {
-    setIsDeleting(true);
+  const handleCommentDelete = async (commentId) => {
+    if (!window.confirm('Are you sure you want to delete this comment?')) {
+      return;
+    }
+    
+    setIsDeletingComment(commentId);
     try {
-      await onDelete(post.id);
+      await onCommentDelete(post.id, commentId);
+      toast.success('Comment deleted successfully');
     } catch (error) {
-      toast.error('Failed to delete post');
+      toast.error(error.response?.data?.error || 'Failed to delete comment');
     } finally {
-      setIsDeleting(false);
+      setIsDeletingComment(null);
     }
   };
 
+  const LoadingSpinner = () => (
+    <svg 
+      className="animate-spin h-4 w-4 mr-1" 
+      xmlns="http://www.w3.org/2000/svg" 
+      fill="none" 
+      viewBox="0 0 24 24"
+    >
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+  );
+
+  const ProfileImage = ({ src, alt, size = "w-10 h-10" }) => (
+    <img
+      src={src || '/default-avatar.png'}
+      alt={alt || 'User'}
+      className={`${size} rounded-full object-cover border-2 border-indigo-200`}
+      onError={(e) => {
+        e.target.onerror = null;
+        e.target.src = '/default-avatar.png';
+      }}
+    />
+  );
+
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+    <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-8 border border-gray-100">
       {/* Post Header */}
-      <div className="p-4 border-b">
+      <div className="p-6 border-b border-gray-100">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <img
-              src={post.user?.profilePicture || '/default-avatar.png'}
-              alt={post.user?.name}
-              className="w-10 h-10 rounded-full object-cover"
+          <div className="flex items-center space-x-4">
+            <ProfileImage 
+              src={post.userProfilePicture} 
+              alt={post.userName || 'Author'} 
             />
             <div>
-              <h3 className="font-semibold">{post.user?.name}</h3>
+              <h3 className="font-bold text-indigo-900">{post.userName || post.user?.name}</h3>
               <p className="text-xs text-gray-500">
                 {new Date(post.createdAt).toLocaleString()}
               </p>
             </div>
           </div>
-          {user?.email === post.userId && (
+          
+          {!isAuthor && user && (
             <button
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="text-red-500 hover:text-red-700 disabled:opacity-50"
+              onClick={handleFollow}
+              disabled={isFollowingLoading}
+              className={`px-4 py-1.5 text-sm rounded-full font-semibold transition-colors flex items-center ${
+                isFollowing
+                  ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700'
+              }`}
+              aria-label={isFollowing ? 'Unfollow user' : 'Follow user'}
             >
-              {isDeleting ? 'Deleting...' : 'Delete'}
+              {isFollowingLoading ? (
+                <span className="flex items-center">
+                  <LoadingSpinner />
+                  {isFollowing ? 'Unfollowing...' : 'Following...'}
+                </span>
+              ) : (
+                isFollowing ? 'Following' : 'Follow'
+              )}
             </button>
           )}
         </div>
       </div>
 
       {/* Post Content */}
-      <div className="p-4">
-        <p className="mb-3">{post.content}</p>
+      <div className="p-6">
+        <p className="mb-4 text-gray-800 whitespace-pre-line leading-relaxed">{post.content}</p>
         
-        {/* Media Gallery */}
         {post.mediaUrls?.length > 0 && (
-          <div className={`grid gap-2 mb-3 ${
+          <div className={`grid gap-3 mb-4 ${
             post.mediaUrls.length === 1 ? 'grid-cols-1' : 
             post.mediaUrls.length === 2 ? 'grid-cols-2' : 'grid-cols-3'
           }`}>
             {post.mediaUrls.map((url, index) => (
-              <div key={index} className="relative aspect-square bg-gray-100 rounded-md overflow-hidden">
+              <div key={index} className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden">
                 <img
                   src={url}
                   alt={`Post media ${index + 1}`}
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = '/default-image.png';
+                  }}
                 />
               </div>
             ))}
           </div>
         )}
 
-        {/* Tags */}
-        {post.tags?.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-3">
-            {post.tags.map((tag, index) => (
-              <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                #{tag}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Skill Category */}
-        {post.skillCategory && (
-          <div className="mb-3">
-            <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
+        <div className="flex flex-wrap gap-2 mb-4">
+          {post.tags?.map((tag, index) => (
+            <span key={`tag-${index}`} className="px-2.5 py-1 bg-indigo-100 text-indigo-800 text-xs font-medium rounded-full">
+              #{tag}
+            </span>
+          ))}
+          {post.skillCategory && (
+            <span className="px-2.5 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
               {post.skillCategory}
             </span>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* Like and Comment Buttons */}
-        <div className="flex items-center space-x-4 pt-2 border-t">
+        <div className="flex items-center space-x-6 pt-3 border-t border-gray-100">
           <button
             onClick={handleLike}
             disabled={isLiking || !user}
-            className={`flex items-center space-x-1 ${
-              post.likes?.includes(user?.email) ? 'text-red-500' : 'text-gray-500'
+            className={`flex items-center space-x-1.5 text-sm font-medium transition-colors ${
+              hasLiked ? 'text-red-500' : 'text-gray-500'
             } ${!user ? 'opacity-50 cursor-not-allowed' : 'hover:text-red-600'}`}
+            aria-label={hasLiked ? 'Unlike post' : 'Like post'}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="h-5 w-5"
-              fill={post.likes?.includes(user?.email) ? 'currentColor' : 'none'}
+              fill={hasLiked ? 'currentColor' : 'none'}
               viewBox="0 0 24 24"
               stroke="currentColor"
             >
@@ -146,9 +245,11 @@ export default function PostCard({ post, onDelete, onLike, onComment }) {
             </svg>
             <span>{post.likes?.length || 0}</span>
           </button>
+          
           <button
             onClick={() => setShowComments(!showComments)}
-            className="flex items-center space-x-1 text-gray-500 hover:text-gray-600"
+            className="flex items-center space-x-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+            aria-label="Toggle comments"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -169,69 +270,81 @@ export default function PostCard({ post, onDelete, onLike, onComment }) {
         </div>
       </div>
 
-      {/* Comments Section */}
       {showComments && (
-        <div className="bg-gray-50 p-4 border-t">
-          {/* Comment Form */}
-          {user && (
-            <form onSubmit={handleCommentSubmit} className="mb-4">
-              <div className="flex space-x-2">
+        <div className="bg-gray-50 p-6 border-t border-gray-100">
+          {user ? (
+            <form onSubmit={handleCommentSubmit} className="mb-6">
+              <div className="flex space-x-3">
                 <input
                   type="text"
                   value={commentContent}
                   onChange={(e) => setCommentContent(e.target.value)}
                   placeholder="Add a comment..."
-                  className="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors text-gray-800"
                   disabled={isCommenting}
+                  aria-label="Comment input"
                 />
                 <button
                   type="submit"
                   disabled={!commentContent.trim() || isCommenting}
-                  className={`px-3 py-2 rounded-md ${
+                  className={`px-6 py-2.5 rounded-lg font-semibold transition-all flex items-center ${
                     !commentContent.trim() || isCommenting
-                      ? 'bg-blue-300 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  } text-white`}
+                      ? 'bg-indigo-300 cursor-not-allowed'
+                      : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                  }`}
+                  aria-label="Submit comment"
                 >
-                  {isCommenting ? 'Posting...' : 'Post'}
+                  {isCommenting ? (
+                    <>
+                      <LoadingSpinner />
+                      <span>Posting...</span>
+                    </>
+                  ) : 'Post'}
                 </button>
               </div>
             </form>
+          ) : (
+            <p className="text-center text-gray-500 italic mb-6 text-sm font-medium">
+              Please login to add comments
+            </p>
           )}
 
-          {/* Comments List */}
-          <div className="space-y-3">
+          <div className="space-y-4">
             {post.comments?.length > 0 ? (
               post.comments.map((comment) => (
-                <div key={comment.id} className="flex items-start space-x-2">
-                  <img
-                    src={comment.user?.profilePicture || '/default-avatar.png'}
-                    alt={comment.user?.name}
-                    className="w-8 h-8 rounded-full object-cover"
+                <div key={comment.id} className="flex items-start space-x-3">
+                  <ProfileImage 
+                    src={comment.userProfilePicture} 
+                    alt={comment.userName || 'Commenter'} 
+                    size="w-8 h-8" 
                   />
-                  <div className="flex-1 bg-white p-2 rounded-md shadow-sm">
+                  <div className="flex-1 bg-white p-4 rounded-lg shadow-sm border border-gray-100">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h4 className="font-semibold text-sm">{comment.user?.name}</h4>
-                        <p className="text-sm">{comment.content}</p>
+                        <h4 className="font-semibold text-sm text-indigo-900">{comment.userName}</h4>
+                        <p className="text-sm text-gray-800 whitespace-pre-line mt-1">{comment.content}</p>
+                        <p className="text-xs text-gray-500 mt-2">
+                          {new Date(comment.createdAt).toLocaleString()}
+                        </p>
                       </div>
-                      {(user?.email === comment.userId || user?.email === post.userId) && (
+                      {(user?.email === comment.userEmail || user?.email === post.userId) && (
                         <button
-                          onClick={() => onCommentDelete(post.id, comment.id)}
-                          className="text-red-500 hover:text-red-700 text-xs"
+                          onClick={() => handleCommentDelete(comment.id)}
+                          disabled={isDeletingComment === comment.id}
+                          className={`text-red-500 hover:text-red-700 text-xs font-medium transition-colors ${
+                            isDeletingComment === comment.id ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                          aria-label="Delete comment"
                         >
-                          Delete
+                          {isDeletingComment === comment.id ? 'Deleting...' : 'Delete'}
                         </button>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {new Date(comment.createdAt).toLocaleString()}
-                    </p>
                   </div>
                 </div>
               ))
             ) : (
-              <p className="text-center text-gray-500 py-2">No comments yet</p>
+              <p className="text-center text-gray-500 py-3 text-sm font-medium">No comments yet</p>
             )}
           </div>
         </div>
