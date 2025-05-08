@@ -15,7 +15,28 @@ export default function CommunityDetail({ community, onBack, currentUserId }) {
 
 
 
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        setLoading(true);
+        const { data } = await axios.get(`http://localhost:8081/api/communities/${community.id}/messages`, {
+          withCredentials: true
+        });
+        setMessages(data);
+        
+        await axios.post(`http://localhost:8081/api/communities/${community.id}/mark-as-read`, {}, {
+          withCredentials: true
+        });
+      } catch (error) {
+        toast.error('Failed to load messages');
+        console.error('Error fetching messages:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
+    fetchMessages();
+  }, [community.id]);
 
   useEffect(() => {
     const fetchUserDetails = async () => {
