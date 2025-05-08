@@ -13,7 +13,45 @@ export default function CommunityDetail({ community, onBack, currentUserId }) {
   const stompClient = useRef(null);
   const messageInputRef = useRef(null);
 
+  useEffect(() => {
+    const setupWebSocket = () => {
+      const socket = new SockJS('http://localhost:8081/ws');
+      stompClient.current = new Client({
+        webSocketFactory: () => socket,
+        debug: (str) => {
+          console.log(str);
+        },
+        reconnectDelay: 5000,
+        heartbeatIncoming: 4000,
+        heartbeatOutgoing: 4000,
+      });
 
+      stompClient.current.onConnect = () => {
+        console.log('Connected to WebSocket');
+        stompClient.current.subscribe(`/topic/community/${community.id}`, (message) => {
+          const receivedMessage = JSON.parse(message.body);
+          setMessages(prevMessages => [...prevMessages, receivedMessage]);
+        });
+      };
+
+      stompClient.current.onStompError = (frame) => {
+        console.error('STOMP error', frame);
+        toast.error('Connection error');
+      };
+
+      stompClient.current.activate();
+    };
+
+    if (community) {
+      setupWebSocket();
+    }
+
+    return () => {
+      if (stompClient.current && stompClient.current.connected) {
+        stompClient.current.deactivate();
+      }
+    };
+  }, [community.id]);
 
   useEffect(() => {
     const fetchMessages = async () => {
