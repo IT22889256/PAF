@@ -1,6 +1,5 @@
 package com.paf.server.model;
 
-
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -14,6 +13,7 @@ public class User {
     private String id;
     private String name;
     private String email;
+    private String password;
     private String profilePicture;
     private String bio;
     private String location;
@@ -25,5 +25,5 @@ public class User {
     private List<String> following = new ArrayList<>();
     private List<String> followers = new ArrayList<>();
     private List<String> postIds = new ArrayList<>();
-    
+
 }
