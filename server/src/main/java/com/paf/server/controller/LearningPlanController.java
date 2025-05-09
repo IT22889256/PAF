@@ -46,6 +46,14 @@ public class LearningPlanController {
         return ResponseEntity.ok(learningPlanService.updatePlan(planId, planUpdates, userId));
     }
 
+    @GetMapping("/{planId}")
+    public ResponseEntity<LearningPlan> getPlan(
+            @PathVariable String planId,
+            @AuthenticationPrincipal OAuth2User principal) {
+        String userId = (String) principal.getAttribute("email");
+        return ResponseEntity.ok(learningPlanService.getPlanAndValidateOwnership(planId, userId));
+    }
+
     @DeleteMapping("/{planId}")
     public ResponseEntity<Void> deletePlan(
             @PathVariable String planId,
