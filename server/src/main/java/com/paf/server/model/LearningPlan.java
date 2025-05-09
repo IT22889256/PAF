@@ -28,6 +28,7 @@ public class LearningPlan {
         private String title;
         private String description;
         private List<String> resources; // URLs or references
-
+        private boolean completed;
+        private LocalDateTime completedAt;
     }
 }
