@@ -3,6 +3,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.List;
 import java.util.Map;
@@ -63,3 +69,21 @@ public ResponseEntity<Void> deletePost(
     postService.deletePost(id, userId);
     return ResponseEntity.noContent().build();
 }
+@PostMapping("/{postId}/like")
+public ResponseEntity<Post> likePost(
+        @PathVariable String postId,
+        @AuthenticationPrincipal OAuth2User principal) {
+    String userId = (String) principal.getAttribute("email");
+    Post post = postService.likePost(postId, userId);
+    return ResponseEntity.ok(post);
+}
+
+@PostMapping("/{postId}/unlike")
+public ResponseEntity<Post> unlikePost(
+        @PathVariable String postId,
+        @AuthenticationPrincipal OAuth2User principal) {
+    String userId = (String) principal.getAttribute("email");
+    Post post = postService.unlikePost(postId, userId);
+    return ResponseEntity.ok(post);
+}
+
