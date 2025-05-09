@@ -159,7 +159,7 @@ public class LearningPlanService {
         plan.setProgress(progress);
     }
 
-    private LearningPlan getPlanAndValidateOwnership(String planId, String userId) {
+    public LearningPlan getPlanAndValidateOwnership(String planId, String userId) {
         LearningPlan plan = learningPlanRepository.findById(planId)
                 .orElseThrow(() -> new RuntimeException("Learning plan with ID " + planId + " not found"));
 
@@ -168,5 +168,10 @@ public class LearningPlanService {
         }
 
         return plan;
+    }
+
+    public LearningPlan getPlanById(String planId, String userEmail) {
+        User user = validateUserByEmail(userEmail);
+        return getPlanAndValidateOwnership(planId, user.getId());
     }
 }
